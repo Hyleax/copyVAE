@@ -175,6 +175,7 @@ def run_pipeline(umi_counts, cell_cycle_gene_list):
                   'start_position',
                   'end_position']
     gene_map = build_gene_map(server_url, attributes)
+
     data, chrom_list = bin_genes_from_anndata(adata, bin_size, gene_map)
     with open('chrom_list.npy', 'wb') as f:
         np.save(f, chrom_list)
@@ -220,9 +221,9 @@ def run_pipeline(umi_counts, cell_cycle_gene_list):
     _, _, latent_z = copyvae.z_encoder(norm_x)
     copy_bin = copyvae.encoder([norm_x,latent_z])
 
-    data.obsm['latent'] = z
+    data.obsm['latent'] = z.numpy()
     #draw_umap(data, 'latent', '_latent')
-    data.obsm['copy_number'] = copy_bin
+    data.obsm['copy_number'] = copy_bin.numpy()
     #draw_umap(data, 'copy_number', '_copy_number')
     #draw_heatmap(copy_bin,'bin_copies')
     with open('copy.npy', 'wb') as f:
@@ -247,7 +248,12 @@ def run_pipeline(umi_counts, cell_cycle_gene_list):
         with open(filename, 'wb') as f:
             np.save(f, breakpoints)
 
-    return None
+    # Store clone labels
+    data.obs['clone'] = pred_label.astype(str)
+
+    return data
+
+
 
 
 def main():

@@ -111,6 +111,155 @@ def build_gene_map(server_url, attributes, chr_pos=CHR_BASE_PAIRS):
     return gene_info
 
 
+# def bin_genes_from_anndata(adata, bin_size, gene_map):
+#     """
+#     Perform gene binning for UMI counts.
+
+#     Args:
+#         adata (anndata object): Anndata object with UMI counts.
+#         bin_size (int): Number of genes per bin.
+#         gene_map (pd.DataFrame): Gene map with chromosome and absolute position information.
+
+#     Returns:
+#         data (anndata object): Anndata object with binned gene counts.
+#         chrom_list (list): List of chromosome boundary bins.
+#     """
+
+#     import numpy as np
+#     import scanpy as sc
+
+#     # ------------------------------
+#     # Filter genes
+#     # ------------------------------
+#     sc.pp.filter_genes(adata, min_cells=1)
+
+#     # ------------------------------
+#     # Determine which gene field to use
+#     # ------------------------------
+#     if 'gene_ids' in adata.var.columns:
+#         gene_key = 'gene_ids'
+#     else:
+#         gene_key = None
+
+#     # ------------------------------
+#     # Build mapping dictionaries
+#     # ------------------------------
+#     map_chr = dict(gene_map[['Gene name', 'chr']].values)
+#     map_abs = dict(gene_map[['Gene name', 'abspos']].values)
+
+#     # ------------------------------
+#     # Map chromosome and abs position
+#     # ------------------------------
+#     if gene_key is not None:
+#         adata.var['chr'] = adata.var[gene_key].map(map_chr)
+#         adata.var['abspos'] = adata.var[gene_key].map(map_abs)
+#         print(adata.var)
+#     else:
+#         # Fall back to var_names
+#         adata.var['chr'] = adata.var_names.map(map_chr)
+#         adata.var['abspos'] = adata.var_names.map(map_abs)
+
+#     # ------------------------------
+#     # Filter out unmapped genes
+#     # ------------------------------
+#     valid_mask = (
+#         adata.var['chr'].notna() &
+#         adata.var['abspos'].notna()
+#     )
+
+#     adata_clean = adata[:, valid_mask].copy()
+
+#     # ------------------------------
+#     # Safety checks
+#     # ------------------------------
+#     if adata_clean.n_vars == 0:
+#         raise ValueError(
+#             "No genes remaining after chromosome/position mapping. "
+#             "Gene identifiers likely do not match gene_map."
+#         )
+
+#     # Convert chromosome and abspos to integers
+#     adata_clean.var['chr'] = adata_clean.var['chr'].astype(int)
+#     adata_clean.var['abspos'] = adata_clean.var['abspos'].astype(int)
+
+#     # ------------------------------
+#     # Sort genes by genomic position
+#     # ------------------------------
+#     sorted_idx = adata_clean.var.sort_values(by='abspos').index
+#     adata_clean = adata_clean[:, sorted_idx].copy()
+
+#     # ------------------------------
+#     # Calculate genes exceeding bin size
+#     # ------------------------------
+#     chr_counts = adata_clean.var['chr'].value_counts().sort_index()
+#     n_exceeded = chr_counts % bin_size
+
+#     ind_list = []
+
+#     for chrom in n_exceeded.index:
+
+#         n = n_exceeded.loc[chrom]
+
+#         # Skip if perfectly divisible
+#         if n == 0:
+#             continue
+
+#         chrom_genes = adata_clean.var[
+#             adata_clean.var['chr'] == chrom
+#         ].sort_values(by=['n_cells', 'abspos'])
+
+#         ind = chrom_genes.iloc[:n].index.values
+
+#         ind_list.append(ind)
+
+#     # ------------------------------
+#     # Remove exceeded genes
+#     # ------------------------------
+#     if len(ind_list) > 0:
+#         remove_inds = np.concatenate(ind_list)
+
+#         data = adata_clean[
+#             :,
+#             ~adata_clean.var.index.isin(remove_inds)
+#         ].copy()
+#     else:
+#         data = adata_clean.copy()
+
+#     # ------------------------------
+#     # Find chromosome boundary bins
+#     # ------------------------------
+#     bin_number = (
+#         data.var['chr']
+#         .value_counts()
+#         .sort_index() // bin_size
+#     )
+
+#     chrom_bound = bin_number.cumsum()
+
+#     # ------------------------------
+#     # Build chromosome boundary list
+#     # ------------------------------
+#     chrom_list = []
+
+#     prev = 0
+
+#     for boundary in chrom_bound.values:
+#         chrom_list.append((prev, int(boundary)))
+#         prev = int(boundary)
+
+#     # ------------------------------
+#     # Debug information
+#     # ------------------------------
+#     # print("\nChromosome counts:")
+#     # print(chr_counts)
+
+#     # print("\nChromosome boundaries:")
+#     # print(chrom_bound)
+
+#     # print(f"\nFinal dataset shape: {data.shape}")
+
+#     return data, chrom_list
+
 def bin_genes_from_anndata(adata, bin_size, gene_map):
     """
     Perform gene binning for UMI counts.
@@ -125,14 +274,17 @@ def bin_genes_from_anndata(adata, bin_size, gene_map):
         chrom_list (list): List of chromosome boundary bins.
     """
 
+    print(adata)
     # Normalize UMI counts
     sc.pp.filter_genes(adata, min_cells=1)
+    print(adata)
 
     # Map chromosome and absolute position information
     map_chr = dict(gene_map[['Gene name', 'chr']].values)
-    adata.var['chr'] = adata.var.gene_ids.map(map_chr)
+    adata.var['chr'] = adata.var.gene_symbol.map(map_chr)
+    # print(adata.var)
     map_abs = dict(gene_map[['Gene name', 'abspos']].values)
-    adata.var['abspos'] = adata.var.gene_ids.map(map_abs)
+    adata.var['abspos'] = adata.var.gene_symbol.map(map_abs)
 
     # Filter out genes with missing chromosome or absolute position
     adata_clean = adata[:, adata.var.chr.notna() & adata.var.abspos.notna()].copy()
@@ -141,6 +293,7 @@ def bin_genes_from_anndata(adata, bin_size, gene_map):
 
     # Sort genes by absolute position
     adata_clean = adata_clean[:, list(adata_clean.var.sort_values(by='abspos').index)].copy()
+
 
     # Calculate the number of genes exceeded for each chromosome
     n_exceeded = adata_clean.var['chr'].value_counts() % bin_size
@@ -154,7 +307,6 @@ def bin_genes_from_anndata(adata, bin_size, gene_map):
 
     # Remove exceeded genes
     data = adata_clean[:, ~adata_clean.var.index.isin(np.concatenate(ind_list))].copy()
-
     # Find chromosome boundary bins
     bin_number = adata_clean.var['chr'].value_counts() // bin_size
     chrom_bound = bin_number.sort_index().cumsum()

@@ -41,27 +41,79 @@ def find_clones_dbscan(data, min_members=1):
 
     return prediction
 
+# def auto_corr(cluster_data):
+#     """
+#     Calculate the autocorrelation of cluster data.
+
+#     Args:
+#         cluster_data (np.ndarray): Data array with shape (n_samples, n_features).
+
+#     Returns:
+#         autocorrelation: Autocorrelation value.
+#     """
+
+#     n_samples = cluster_data.shape[0]
+#     res = 0
+#     count = 0
+
+#     for i in range(n_samples):
+#         for j in range(i, n_samples):
+#             res += np.sum(cluster_data[i,:] * cluster_data[j,:])
+#             count += 1
+#     res = res / count
+#     autocorrelation = res / np.var(cluster_data,axis=1).mean()
+
+#     return autocorrelation
+
 def auto_corr(cluster_data):
     """
     Calculate the autocorrelation of cluster data.
 
     Args:
-        cluster_data (np.ndarray): Data array with shape (n_samples, n_features).
+        cluster_data (np.ndarray): 
+            Data array with shape (n_samples, n_features).
 
     Returns:
-        autocorrelation: Autocorrelation value.
+        float: Autocorrelation value.
     """
 
+    import numpy as np
+
+    # Convert np.matrix -> ndarray
+    cluster_data = np.asarray(cluster_data)
+
     n_samples = cluster_data.shape[0]
+
+    # Safety check
+    if n_samples == 0:
+        return 0
+
     res = 0
     count = 0
 
     for i in range(n_samples):
         for j in range(i, n_samples):
-            res += np.sum(cluster_data[i,:] * cluster_data[j,:])
+
+            # Element-wise multiplication
+            res += np.sum(
+                cluster_data[i, :] * cluster_data[j, :]
+            )
+
             count += 1
+
+    # Avoid division by zero
+    if count == 0:
+        return 0
+
     res = res / count
-    autocorrelation = res / np.var(cluster_data,axis=1).mean()
+
+    var_mean = np.var(cluster_data, axis=1).mean()
+
+    # Avoid divide-by-zero
+    if var_mean == 0:
+        return 0
+
+    autocorrelation = res / var_mean
 
     return autocorrelation
 
